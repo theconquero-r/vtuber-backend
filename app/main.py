@@ -26,17 +26,16 @@ async def process_audio(character: str = Form("itachi"), audio: UploadFile = Fil
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(audio.file, buffer)
     
-    clean_path = os.path.join(OUTPUT_DIR, f"clean_{int(time.time())}_{audio.filename}")
-    cleaned_audio_path = clean_voice(input_path, clean_path)
-    
+    # Render Free Tier 0.1 vCPU is too slow for noisereduce (takes > 100s timeout)
+    # So we just return the raw user voice directly for instant processing!
     output_path = os.path.join(OUTPUT_DIR, f"output_{int(time.time())}.wav")
-    
     print(f"Received character request: '{character}'")
-    shutil.copy(cleaned_audio_path, output_path)
+    shutil.copy(input_path, output_path)
     
+    # Return absolute path so Unity can load it easily
     abs_output_path = os.path.abspath(output_path)
     
-    # 4. Return the response directly as a file (Naya Change Yahan Hai)
+    # 4. Return the response directly as a file
     from fastapi.responses import FileResponse
     return FileResponse(abs_output_path, media_type="audio/wav")
 
