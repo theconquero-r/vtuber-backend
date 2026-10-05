@@ -12,7 +12,6 @@ OUTPUT_DIR = "outputs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Connect to a permanent public RVC space on HuggingFace!
 try:
     rvc_client = Client("ardha27/rvc-models")
 except Exception as e:
@@ -23,33 +22,23 @@ from app.services.audio_cleaning import clean_voice
 
 @app.post("/process-audio/")
 async def process_audio(character: str = Form("itachi"), audio: UploadFile = File(...)):
-    # 1. Save uploaded file
     input_path = os.path.join(UPLOAD_DIR, f"input_{int(time.time())}_{audio.filename}")
     with open(input_path, "wb") as buffer:
         shutil.copyfileobj(audio.file, buffer)
     
-    # 2. Audio Cleaning & Noise Reduction
     clean_path = os.path.join(OUTPUT_DIR, f"clean_{int(time.time())}_{audio.filename}")
     cleaned_audio_path = clean_voice(input_path, clean_path)
     
-    # 3. Voice Conversion (RVC) using Cloud API!
     output_path = os.path.join(OUTPUT_DIR, f"output_{int(time.time())}.wav")
     
     print(f"Received character request: '{character}'")
-    
-    # Just copy the cleaned audio. 
-    # (Since Cloud AI fails and local pitch-shift sounds robotic, we'll keep the user's natural acting voice!)
     shutil.copy(cleaned_audio_path, output_path)
     
-    # Return absolute path so Unity can load it easily
     abs_output_path = os.path.abspath(output_path)
     
-    # 4. Return the response
-    return {
-        "status": "success",
-        "message": f"Audio processed successfully",
-        "output_audio": abs_output_path,
-    }
+    # 4. Return the response directly as a file (Naya Change Yahan Hai)
+    from fastapi.responses import FileResponse
+    return FileResponse(abs_output_path, media_type="audio/wav")
 
 from fastapi.responses import FileResponse
 import zipfile
@@ -71,9 +60,7 @@ async def render_video(zip_file: UploadFile = File(...)):
         zip_ref.extractall(render_dir)
         
     print(f"Extracted frames to {render_dir}")
-    
     output_mp4 = os.path.join(render_dir, "final_video.mp4")
-    
     ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     
     ffmpeg_cmd = [
@@ -90,8 +77,6 @@ async def render_video(zip_file: UploadFile = File(...)):
     
     try:
         subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print("FFmpeg rendering complete!")
         return FileResponse(output_mp4, media_type="video/mp4", filename="vtuber_export.mp4")
     except subprocess.CalledProcessError as e:
-        print("FFmpeg Error:", e.stderr.decode())
         return {"status": "error", "message": e.stderr.decode()}
